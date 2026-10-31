@@ -14,6 +14,15 @@ export function clampRating(rating: number): number {
 }
 
 /**
+ * Formats a numeric rating on the five-star scale or labels an unrated game.
+ */
+export function formatRatingValue(rating: number | null): string {
+    if (rating === null) return 'No rating yet';
+
+    return `${clampRating(rating).toFixed(1)} / 5`;
+}
+
+/**
  * Builds a star glyph string for a rating between 0 and 5.
  *
  * Renders full (★), an optional half (½) and empty (☆) stars. Returns
