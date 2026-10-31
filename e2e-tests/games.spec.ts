@@ -1,6 +1,72 @@
 import { test, expect, type Response } from '@playwright/test';
 
 test.describe('Game Listing and Navigation', () => {
+  test('should filter games by multiple selected categories and clear filters', async ({ page }) => {
+    await page.goto('/');
+
+    const categoryFilters = page.getByTestId('category-filter');
+    const firstCategory = categoryFilters.nth(0);
+    const secondCategory = categoryFilters.nth(1);
+    const firstCategoryId = await firstCategory.inputValue();
+    const secondCategoryId = await secondCategory.inputValue();
+    const expectedVisibleCount =
+      (await page.locator(`[data-category-id="${firstCategoryId}"]`).count()) +
+      (await page.locator(`[data-category-id="${secondCategoryId}"]`).count());
+
+    await test.step('Select two categories and verify matching games remain', async () => {
+      await firstCategory.check();
+      await secondCategory.check();
+
+      await expect(page.locator('[data-testid="game-card"]:visible')).toHaveCount(expectedVisibleCount);
+      await expect(page.getByTestId('filter-results')).toHaveText(`Showing ${expectedVisibleCount} games.`);
+    });
+
+    await test.step('Clear the filters and restore the full catalog', async () => {
+      await page.getByTestId('clear-filters').click();
+
+      await expect(firstCategory).not.toBeChecked();
+      await expect(secondCategory).not.toBeChecked();
+      await expect(page.getByTestId('publisher-filter')).toHaveValue('');
+      await expect(page.locator('[data-testid="game-card"]:visible')).toHaveCount(
+        await page.getByTestId('game-card').count(),
+      );
+    });
+  });
+
+  test('should filter by publisher and combine it with a category', async ({ page }) => {
+    await page.goto('/');
+
+    const firstCategory = page.getByTestId('category-filter').first();
+    const categoryId = await firstCategory.inputValue();
+    const categoryCards = page.locator(`[data-category-id="${categoryId}"]`);
+    const publisherId = await categoryCards.first().getAttribute('data-publisher-id');
+    if (!publisherId) {
+      throw new Error('The selected category has no game with a publisher.');
+    }
+
+    const publisherFilter = page.getByTestId('publisher-filter');
+    const publisherCards = page.locator(`[data-publisher-id="${publisherId}"]`);
+
+    await test.step('Filter the catalog by publisher', async () => {
+      await publisherFilter.selectOption(publisherId);
+      await expect(page.locator('[data-testid="game-card"]:visible')).toHaveCount(await publisherCards.count());
+    });
+
+    await test.step('Combine the publisher and category filters', async () => {
+      const combinedCards = page.locator(
+        `[data-category-id="${categoryId}"][data-publisher-id="${publisherId}"]`,
+      );
+
+      await firstCategory.check();
+
+      await expect(page.locator('[data-testid="game-card"]:visible')).toHaveCount(await combinedCards.count());
+      const combinedCount = await combinedCards.count();
+      await expect(page.getByTestId('filter-results')).toHaveText(
+        `Showing ${combinedCount} ${combinedCount === 1 ? 'game' : 'games'}.`,
+      );
+    });
+  });
+
   test('should display games with titles on index page', async ({ page }) => {
     await test.step('Navigate to homepage', async () => {
       await page.goto('/');
